@@ -10,7 +10,8 @@ prompt_template = client.pull_prompt("session-ledger-prompt")
 
 llm = ChatGoogleGenerativeAI(
     model="gemini-3.7-flash",
-    temperature=0.1
+    temperature=0.1,
+    max_retries=5
 )
 
 structured_llm = llm.with_structured_output(SessionSummaryOutput)
