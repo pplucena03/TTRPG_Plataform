@@ -38,3 +38,26 @@ class SessionLedgerRequest(BaseModel):
     raw_notes: str = Field(
         description="Unformatted GM notes or chat logs taken during the live session."
     )
+
+
+class EntityResponse(ExtractedEntity):
+    id: int
+    session_id: int
+
+    class Config:
+        from_attributes = True  # Allows Pydantic to read SQLAlchemy models
+
+class SessionResponse(BaseModel):
+    id: int
+    campaign_id: int
+    title: str
+    raw_notes: str
+    unresolved_hooks: list[str]
+    entities: list[EntityResponse] = []
+
+    class Config:
+        from_attributes = True
+
+class SessionUpdateRequest(BaseModel):
+    title: str | None = None
+    unresolved_hooks: list[str] | None = None

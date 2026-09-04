@@ -18,8 +18,8 @@ structured_llm = llm.with_structured_output(SessionSummaryOutput)
 
 ledger_chain = prompt_template | structured_llm
 
-def run_session_ledger(payload: SessionLedgerRequest) -> SessionSummaryOutput:
-    return ledger_chain.invoke({
+def run_session_ledger_async(payload: SessionLedgerRequest) -> SessionSummaryOutput:
+    return ledger_chain.ainvoke({
         "campaign_name": payload.campaign_name,
         "game_system": payload.game_system,
         "raw_notes": payload.raw_notes

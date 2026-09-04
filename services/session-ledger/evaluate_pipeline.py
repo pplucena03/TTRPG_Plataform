@@ -1,7 +1,8 @@
+import asyncio
 import os
 from dotenv import load_dotenv
-from langsmith import Client, evaluate
-from app.chain import run_session_ledger
+from langsmith import Client, aevaluate
+from app.chain import run_session_ledger_async
 from app.schemas import SessionLedgerRequest
 
 load_dotenv()
@@ -10,10 +11,9 @@ client = Client()
 DATASET_NAME = "session-ledger-benchmark-v2"
 
 # ---------------------------------------------------------
-# 1. Comprehensive Benchmark Dataset (5 Diverse Cases)
+# 1. Comprehensive Benchmark Dataset
 # ---------------------------------------------------------
 benchmark_data = [
-    # Case 1: Standard Fantasy Narrative
     {
         "inputs": {
             "campaign_name": "Curse of the Sunken Spire",
@@ -24,7 +24,6 @@ benchmark_data = [
             "expected_entities": ["Eldon", "Riverwood", "Amulet of Dawn", "Weeping Caves", "Lord Morvath"]
         }
     },
-    # Case 2: Sci-Fi / Cyberpunk Shorthand
     {
         "inputs": {
             "campaign_name": "Neon Syndicate",
@@ -35,7 +34,6 @@ benchmark_data = [
             "expected_entities": ["Vex", "Club Neon", "Arasaka Tower", "Quantum Deck", "Chrome Skulls"]
         }
     },
-    # Case 3: Horror / Investigation with Fragmented GM Notes
     {
         "inputs": {
             "campaign_name": "Whispers in the Dark",
@@ -46,7 +44,6 @@ benchmark_data = [
             "expected_entities": ["Blackwood Sanatorium", "Dr. Henry Morris", "Necronomicon", "Cult of the Red Moon"]
         }
     },
-    # Case 4: Disambiguation / Negation Test
     {
         "inputs": {
             "campaign_name": "Kingdoms of Iron",
@@ -57,7 +54,6 @@ benchmark_data = [
             "expected_entities": ["Whispering Woods", "Torvald", "Iron Forge", "Guild of Shadows"]
         }
     },
-    # Case 5: Minimal Notes (Negative Control / Hallucination Check)
     {
         "inputs": {
             "campaign_name": "Lost Caverns",
@@ -71,9 +67,7 @@ benchmark_data = [
 ]
 
 def setup_dataset():
-    """Uploads benchmark examples ensuring the dataset contains rows."""
     if not client.has_dataset(dataset_name=DATASET_NAME):
-        print(f"Creating dataset '{DATASET_NAME}'...")
         dataset = client.create_dataset(
             dataset_name=DATASET_NAME,
             description="Comprehensive benchmark suite for TTRPG session extraction."
@@ -84,23 +78,22 @@ def setup_dataset():
                 outputs=entry["outputs"],
                 dataset_id=dataset.id
             )
-        print("Dataset populated with 5 benchmark cases!")
+        print("Dataset created and populated!")
     else:
         print(f"Dataset '{DATASET_NAME}' already exists. Reusing it.")
 
 # ---------------------------------------------------------
-# 2. Target Pipeline Adapter
+# 2. Async Target Pipeline
 # ---------------------------------------------------------
-def target_pipeline(inputs: dict) -> dict:
+async def target_pipeline(inputs: dict) -> dict:
     request_obj = SessionLedgerRequest(**inputs)
-    result = run_session_ledger(request_obj)
+    result = await run_session_ledger_async(request_obj)
     return result.model_dump()
 
 # ---------------------------------------------------------
 # 3. Custom Evaluators
 # ---------------------------------------------------------
 def evaluate_entity_recall(run, example) -> dict:
-    """Measures the proportion of expected entities successfully captured."""
     expected_entities = example.outputs.get("expected_entities", [])
     extracted_entities = [
         item["name"].lower() for item in run.outputs.get("extracted_entities", [])
@@ -117,7 +110,6 @@ def evaluate_entity_recall(run, example) -> dict:
     return {"key": "entity_recall", "score": recall_score}
 
 def evaluate_completeness(run, example) -> dict:
-    """Verifies that all primary output fields are non-empty."""
     has_title = bool(run.outputs.get("title"))
     has_events = len(run.outputs.get("key_events", [])) > 0
     has_entities = len(run.outputs.get("extracted_entities", [])) > 0
@@ -126,17 +118,20 @@ def evaluate_completeness(run, example) -> dict:
     return {"key": "completeness", "score": 1 if passed else 0}
 
 # ---------------------------------------------------------
-# 4. Execution
+# 4. Async Execution via asyncio.run
 # ---------------------------------------------------------
-if __name__ == "__main__":
+async def run_evaluation():
     setup_dataset()
-    print("Executing evaluation experiment across 5 benchmark cases...")
+    print("Executing async evaluation experiment...")
     
-    experiment_results = evaluate(
+    experiment_results = await aevaluate(
         target_pipeline,
         data=DATASET_NAME,
         evaluators=[evaluate_entity_recall, evaluate_completeness],
-        experiment_prefix="session-ledger-v2-eval"
+        experiment_prefix="session-ledger-async-eval",
+        max_concurrency=1
     )
-    
-    print("\nEvaluation complete! Check the scorecard in LangSmith.")
+    print("\nAsync evaluation complete! Check LangSmith.")
+
+if __name__ == "__main__":
+    asyncio.run(run_evaluation())
